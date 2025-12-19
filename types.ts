@@ -23,11 +23,32 @@ export enum ProcessingStep {
     ERROR = 'ERROR'
 }
 
+export enum AgentStatus {
+    ACTIVE = 'ACTIVE',
+    INACTIVE = 'INACTIVE'
+}
+
 export interface UserProfile {
     id?: number;
     username: string;
     email: string;
     fullName: string;
+}
+
+export interface Agent {
+    id: string;
+    agentName: string;
+    agentDescription: string;
+    llmProvider: string;
+    llmApiKey: string;
+    llmModel: string;
+    llmMaxTokens: number;
+    llmTemperature: number;
+    status: AgentStatus;
+    autoProcessTickets: boolean;
+    maxConcurrentTickets: number;
+    gitWorkspaceDir: string;
+    lastActiveAt?: string;
 }
 
 export interface BotConfig {
@@ -94,4 +115,9 @@ export interface AppHealth {
     zohoApi: string;
     gitlabApi: string;
     uptime: string;
+    totalTickets?: number;
+    pending?: number;
+    processing?: number;
+    completed?: number;
+    failed?: number;
 }

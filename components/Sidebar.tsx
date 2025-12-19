@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Ticket, Activity, Settings, User, LogOut } from 'lucide-react';
+import { LayoutDashboard, Ticket, Activity, Settings, User, LogOut, Bot } from 'lucide-react';
 import Logo from './Logo';
 
 interface SidebarProps {
@@ -12,9 +12,10 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, onLogout }) => {
     const menuItems = [
         { id: 'dashboard', label: 'Painel Geral', icon: <LayoutDashboard size={20} /> },
-        { id: 'tickets', label: 'Agente de Tickets', icon: <Ticket size={20} /> },
-        { id: 'health', label: 'Saúde do Sistema', icon: <Activity size={20} /> },
-        { id: 'settings', label: 'IA & Integrações', icon: <Settings size={20} /> },
+        { id: 'agents', label: 'Meus Agentes', icon: <Bot size={20} /> },
+        { id: 'tickets', label: 'Fila de Tickets', icon: <Ticket size={20} /> },
+        { id: 'health', label: 'Saúde & Logs', icon: <Activity size={20} /> },
+        { id: 'settings', label: 'Integrações', icon: <Settings size={20} /> },
         { id: 'profile', label: 'Meu Perfil', icon: <User size={20} /> },
     ];
 
