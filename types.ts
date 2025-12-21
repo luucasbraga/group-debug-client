@@ -2,25 +2,27 @@
 export enum TicketStatus {
     PENDING = 'PENDING',
     PROCESSING = 'PROCESSING',
-    PR_CREATED = 'PR_CREATED',
+    ANALYZING = 'ANALYZING',
+    FIXING = 'FIXING',
     COMPLETED = 'COMPLETED',
     FAILED = 'FAILED'
 }
 
 export enum ProcessingStep {
-    STARTED = 'STARTED',
-    KEYWORD_EXTRACTION = 'KEYWORD_EXTRACTION',
-    REPOSITORY_IDENTIFICATION = 'REPOSITORY_IDENTIFICATION',
-    ORCHESTRATION = 'ORCHESTRATION',
-    GIT_CLONE = 'GIT_CLONE',
-    BRANCH_CREATION = 'BRANCH_CREATION',
-    AI_ANALYSIS = 'AI_ANALYSIS',
-    CODE_FIX = 'CODE_FIX',
-    GIT_PUSH = 'GIT_PUSH',
-    PR_CREATION = 'PR_CREATION',
-    ZOHO_UPDATE = 'ZOHO_UPDATE',
-    COMPLETED = 'COMPLETED',
-    ERROR = 'ERROR'
+    TICKET_RECEIVED = 'TICKET_RECEIVED',
+    EXTRACTING_KEYWORDS = 'EXTRACTING_KEYWORDS',
+    IDENTIFYING_REPOSITORY = 'IDENTIFYING_REPOSITORY',
+    ANALYZING_DOCUMENTATION = 'ANALYZING_DOCUMENTATION',
+    CLONING_REPOSITORY = 'CLONING_REPOSITORY',
+    CREATING_BRANCH = 'CREATING_BRANCH',
+    ANALYZING_CODE = 'ANALYZING_CODE',
+    APPLYING_CHANGES = 'APPLYING_CHANGES',
+    COMMITTING = 'COMMITTING',
+    PUSHING = 'PUSHING',
+    CREATING_PR = 'CREATING_PR',
+    UPDATING_TICKET = 'UPDATING_TICKET',
+    CLEANUP = 'CLEANUP',
+    FAILED = 'FAILED'
 }
 
 export enum AgentStatus {
@@ -29,16 +31,24 @@ export enum AgentStatus {
 }
 
 export interface UserProfile {
-    id?: number;
     username: string;
     email: string;
     fullName: string;
+    company?: string;
+    department?: string;
+    phone?: string;
+    avatarUrl?: string;
+    timezone?: string;
+    language?: string;
+    role: string;
 }
 
 export interface Agent {
     id: string;
     agentName: string;
     agentDescription: string;
+    prePrompts?: string;
+    botEmail?: string;
     llmProvider: string;
     llmApiKey: string;
     llmModel: string;
@@ -48,36 +58,43 @@ export interface Agent {
     autoProcessTickets: boolean;
     maxConcurrentTickets: number;
     gitWorkspaceDir: string;
+    createdAt?: string;
+    updatedAt?: string;
     lastActiveAt?: string;
 }
 
 export interface BotConfig {
+    botName: string;
+    botEmail: string;
     llmProvider: string;
     llmApiKey: string;
     llmModel: string;
+    llmMaxTokens: number;
+    llmTemperature: number;
+    autoProcessTickets: boolean;
+    maxConcurrentTickets: number;
+    gitWorkspaceDir: string;
 }
 
 export interface ZohoConfig {
-    id?: number;
+    id?: string;
     configName: string;
     orgId: string;
     clientId: string;
-    clientSecret?: string;
-    refreshToken?: string;
+    clientSecret: string;
+    refreshToken: string;
+    webhookSecret?: string;
+    isActive: boolean;
 }
 
 export interface GitLabConfig {
-    id?: number;
+    id?: string;
     configName: string;
-    instanceUrl: string;
-    personalAccessToken: string;
-}
-
-export interface RiskAnalysis {
-    score: number;
-    level: 'LOW' | 'MEDIUM' | 'HIGH';
-    sideEffects: string[];
-    recommendation: string;
+    gitlabUrl: string;
+    personalToken: string;
+    username: string;
+    defaultBranch: string;
+    isActive: boolean;
 }
 
 export interface Ticket {
@@ -87,37 +104,37 @@ export interface Ticket {
     subject: string;
     description: string;
     status: TicketStatus;
-    priority: 'LOW' | 'MEDIUM' | 'HIGH';
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
     repositoryName?: string;
-    repositoryDocs?: string;
-    riskAnalysis?: RiskAnalysis;
+    branchName?: string;
+    pullRequestUrl?: string;
     createdAt: string;
-    processedAt?: string;
+    completedAt?: string;
     processingTimeMs?: number;
-    prUrl?: string;
 }
 
 export interface ProcessingLog {
-    id: string;
-    ticketId: string;
     step: ProcessingStep;
-    status: 'success' | 'failure' | 'warning';
+    status: 'success' | 'failure' | 'warning' | 'in_progress';
     message: string;
-    errorDetails?: string;
-    durationMs?: number;
     createdAt: string;
 }
 
 export interface AppHealth {
-    status: 'UP' | 'DOWN';
-    database: string;
-    redis: string;
-    zohoApi: string;
-    gitlabApi: string;
-    uptime: string;
-    totalTickets?: number;
-    pending?: number;
-    processing?: number;
-    completed?: number;
-    failed?: number;
+    status: string;
+    totalTickets: number;
+    pending: number;
+    processing: number;
+    analyzing: number;
+    fixing: number;
+    completed: number;
+    failed: number;
+    averageProcessingTimeMs: number;
+    activeAgents: number;
+    // Campos legados para compatibilidade se necessário
+    database?: string;
+    redis?: string;
+    zohoApi?: string;
+    gitlabApi?: string;
+    uptime?: string;
 }

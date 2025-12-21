@@ -117,7 +117,19 @@ export const apiService = {
     // --- CONFIG ---
     async getBotConfig(): Promise<BotConfig> {
         const res = await fetch(`${BASE_URL}/config/bot`, { headers: getHeaders() });
-        if (!res.ok) return { llmProvider: 'anthropic', llmApiKey: '', llmModel: 'claude-3-5-sonnet-20241022' };
+        // Fix: Added missing properties to the fallback BotConfig object
+        if (!res.ok) return { 
+            botName: 'Debugger Bot',
+            botEmail: 'bot@groupdebug.ai',
+            llmProvider: 'anthropic', 
+            llmApiKey: '', 
+            llmModel: 'claude-3-5-sonnet-20241022',
+            llmMaxTokens: 4000,
+            llmTemperature: 0.3,
+            autoProcessTickets: true,
+            maxConcurrentTickets: 5,
+            gitWorkspaceDir: '/tmp/repos'
+        };
         return res.json();
     },
 
@@ -199,7 +211,24 @@ export const apiService = {
 
     async getSystemHealth(): Promise<AppHealth> {
         const res = await fetch(`${BASE_URL}/admin/health`, { headers: getHeaders() });
-        if (!res.ok) return { status: 'DOWN', database: '?', redis: '?', zohoApi: '?', gitlabApi: '?', uptime: '?' };
+        // Fix: Added missing properties to the fallback AppHealth object
+        if (!res.ok) return { 
+            status: 'DOWN', 
+            totalTickets: 0,
+            pending: 0,
+            processing: 0,
+            analyzing: 0,
+            fixing: 0,
+            completed: 0,
+            failed: 0,
+            averageProcessingTimeMs: 0,
+            activeAgents: 0,
+            database: '?', 
+            redis: '?', 
+            zohoApi: '?', 
+            gitlabApi: '?', 
+            uptime: '?' 
+        };
         return res.json();
     }
 };

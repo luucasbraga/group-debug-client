@@ -4,7 +4,8 @@ import { Agent, AgentStatus } from '../types';
 import { 
     Plus, Bot, Shield, Trash2, Power, 
     Settings2, Cpu, Database, Network, 
-    Loader2, X, Brain, Terminal, Info
+    Loader2, X, Brain, Terminal, Info,
+    MessageSquareQuote, Edit3, Mail
 } from 'lucide-react';
 
 interface AgentManagerProps {
@@ -12,27 +13,72 @@ interface AgentManagerProps {
     onToggle: (agent: Agent) => void;
     onDelete: (id: string) => void;
     onCreate: (agent: Partial<Agent>) => void;
+    onUpdate: (id: string, agent: Partial<Agent>) => void;
     isLoading?: boolean;
 }
 
-const AgentManager: React.FC<AgentManagerProps> = ({ agents, onToggle, onDelete, onCreate, isLoading }) => {
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [newAgent, setNewAgent] = useState<Partial<Agent>>({
+const AgentManager: React.FC<AgentManagerProps> = ({ agents, onToggle, onDelete, onCreate, onUpdate, isLoading }) => {
+    const [showModal, setShowModal] = useState(false);
+    const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
+    const [formData, setFormData] = useState<Partial<Agent>>({
         agentName: '',
         agentDescription: '',
+        botEmail: '',
+        prePrompts: '',
         llmProvider: 'anthropic',
         llmModel: 'claude-3-5-sonnet-20241022',
-        llmMaxTokens: 4096,
+        llmMaxTokens: 4000,
         llmTemperature: 0.3,
         autoProcessTickets: true,
         maxConcurrentTickets: 5,
         gitWorkspaceDir: '/tmp/repos'
     });
 
+    const openCreateModal = () => {
+        setEditingAgentId(null);
+        setFormData({
+            agentName: '',
+            agentDescription: '',
+            botEmail: '',
+            prePrompts: '',
+            llmProvider: 'anthropic',
+            llmModel: 'claude-3-5-sonnet-20241022',
+            llmMaxTokens: 4000,
+            llmTemperature: 0.3,
+            autoProcessTickets: true,
+            maxConcurrentTickets: 5,
+            gitWorkspaceDir: '/tmp/repos'
+        });
+        setShowModal(true);
+    };
+
+    const openEditModal = (agent: Agent) => {
+        setEditingAgentId(agent.id);
+        setFormData({
+            agentName: agent.agentName,
+            agentDescription: agent.agentDescription,
+            botEmail: agent.botEmail || '',
+            prePrompts: agent.prePrompts || '',
+            llmProvider: agent.llmProvider,
+            llmModel: agent.llmModel,
+            llmApiKey: agent.llmApiKey,
+            llmMaxTokens: agent.llmMaxTokens,
+            llmTemperature: agent.llmTemperature,
+            autoProcessTickets: agent.autoProcessTickets,
+            maxConcurrentTickets: agent.maxConcurrentTickets,
+            gitWorkspaceDir: agent.gitWorkspaceDir
+        });
+        setShowModal(true);
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onCreate(newAgent);
-        setShowCreateModal(false);
+        if (editingAgentId) {
+            onUpdate(editingAgentId, formData);
+        } else {
+            onCreate(formData);
+        }
+        setShowModal(false);
     };
 
     return (
@@ -40,10 +86,10 @@ const AgentManager: React.FC<AgentManagerProps> = ({ agents, onToggle, onDelete,
             <header className="flex items-center justify-between bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/30">
                 <div>
                     <h2 className="text-3xl font-black text-slate-900 mb-1">Meus Operadores</h2>
-                    <p className="text-slate-500 font-medium">Gerencie sua força de trabalho autônoma.</p>
+                    <p className="text-slate-500 font-medium">Gerencie sua força de trabalho autônoma com instruções personalizadas.</p>
                 </div>
                 <button 
-                    onClick={() => setShowCreateModal(true)}
+                    onClick={openCreateModal}
                     className="flex items-center gap-3 px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 active:scale-95"
                 >
                     <Plus size={20} /> Instanciar Agente
@@ -83,6 +129,13 @@ const AgentManager: React.FC<AgentManagerProps> = ({ agents, onToggle, onDelete,
                                 </div>
                                 <div className="flex gap-2">
                                     <button 
+                                        onClick={() => openEditModal(agent)}
+                                        className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                                        title="Editar Configurações"
+                                    >
+                                        <Edit3 size={22} />
+                                    </button>
+                                    <button 
                                         onClick={() => onToggle(agent)}
                                         className={`p-4 rounded-2xl transition-all border ${
                                             agent.status === AgentStatus.ACTIVE 
@@ -101,9 +154,32 @@ const AgentManager: React.FC<AgentManagerProps> = ({ agents, onToggle, onDelete,
                                 </div>
                             </div>
 
-                            <p className="text-slate-500 text-sm font-medium leading-relaxed bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
-                                {agent.agentDescription || "Sem descrição definida para este operador."}
-                            </p>
+                            <div className="space-y-4">
+                                <div className="p-6 bg-slate-50/50 rounded-3xl border border-slate-100">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Descrição Operacional</label>
+                                    <p className="text-slate-600 text-sm font-medium leading-relaxed">
+                                        {agent.agentDescription || "Sem descrição definida para este operador."}
+                                    </p>
+                                </div>
+
+                                {agent.botEmail && (
+                                    <div className="flex items-center gap-2 px-6 py-3 bg-slate-50 rounded-2xl border border-slate-100 text-xs font-bold text-slate-500">
+                                        <Mail size={14} className="text-indigo-400" />
+                                        {agent.botEmail}
+                                    </div>
+                                )}
+
+                                {agent.prePrompts && (
+                                    <div className="p-6 bg-indigo-50/30 rounded-3xl border border-indigo-100/50">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 flex items-center gap-2 mb-2">
+                                            <MessageSquareQuote size={12} /> Instruções Estratégicas (Pre-Prompts)
+                                        </label>
+                                        <p className="text-indigo-900/70 text-xs font-bold leading-relaxed whitespace-pre-wrap italic">
+                                            "{agent.prePrompts}"
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
 
                             <div className="grid grid-cols-3 gap-4">
                                 <div className="p-5 bg-white border border-slate-100 rounded-2xl">
@@ -119,53 +195,62 @@ const AgentManager: React.FC<AgentManagerProps> = ({ agents, onToggle, onDelete,
                                     <p className="text-xs font-mono text-slate-500 overflow-hidden text-ellipsis whitespace-nowrap">{agent.gitWorkspaceDir}</p>
                                 </div>
                             </div>
-
-                            {agent.lastActiveAt && (
-                                <div className="pt-2 border-t border-slate-100 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                                    <Network size={12} /> Última atividade em: {new Date(agent.lastActiveAt).toLocaleString()}
-                                </div>
-                            )}
                         </div>
                     </div>
                 ))}
             </div>
 
-            {/* Modal de Criação */}
-            {showCreateModal && (
+            {/* Modal de Criação / Edição */}
+            {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-6 overflow-y-auto">
-                    <div className="bg-white rounded-[3.5rem] p-12 w-full max-w-2xl shadow-2xl animate-in zoom-in duration-300 relative my-auto">
+                    <div className="bg-white rounded-[3.5rem] p-12 w-full max-w-3xl shadow-2xl animate-in zoom-in duration-300 relative my-auto">
                         <div className="flex justify-between items-center mb-10">
                             <div className="flex gap-4 items-center">
                                 <div className="p-4 bg-indigo-50 rounded-2xl text-indigo-600">
                                     <Brain size={28} />
                                 </div>
                                 <div>
-                                    <h3 className="text-3xl font-black text-slate-900">Novo Operador</h3>
-                                    <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Defina os parâmetros do agente</p>
+                                    <h3 className="text-3xl font-black text-slate-900">{editingAgentId ? 'Editar Operador' : 'Novo Operador'}</h3>
+                                    <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Defina os parâmetros e diretrizes do agente</p>
                                 </div>
                             </div>
-                            <button onClick={() => setShowCreateModal(false)} className="p-3 bg-slate-100 rounded-full hover:bg-slate-200 transition-all">
+                            <button onClick={() => setShowModal(false)} className="p-3 bg-slate-100 rounded-full hover:bg-slate-200 transition-all">
                                 <X size={24} />
                             </button>
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-8">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-6">
                                     <div>
                                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2 ml-1">Codinome do Agente</label>
-                                        <input required type="text" value={newAgent.agentName} onChange={e => setNewAgent({...newAgent, agentName: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-sm text-slate-900" placeholder="Ex: Agente Produção" />
+                                        <input required type="text" value={formData.agentName} onChange={e => setFormData({...formData, agentName: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-sm text-slate-900" placeholder="Ex: Agente Produção" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2 ml-1">E-mail do Bot</label>
+                                        <input type="email" value={formData.botEmail} onChange={e => setFormData({...formData, botEmail: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-medium text-sm text-slate-900" placeholder="bot@empresa.com" />
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2 ml-1">Descrição Operacional</label>
-                                        <textarea value={newAgent.agentDescription} onChange={e => setNewAgent({...newAgent, agentDescription: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-medium text-sm text-slate-600 h-24" placeholder="Para que este agente serve?" />
+                                        <textarea value={formData.agentDescription} onChange={e => setFormData({...formData, agentDescription: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-medium text-sm text-slate-600 h-24" placeholder="Para que este agente serve?" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-indigo-500 block mb-2 ml-1 flex items-center gap-2">
+                                            <MessageSquareQuote size={14} /> Instruções Estratégicas (Pre-Prompts)
+                                        </label>
+                                        <textarea 
+                                            value={formData.prePrompts} 
+                                            onChange={e => setFormData({...formData, prePrompts: e.target.value})} 
+                                            className="w-full bg-indigo-50/30 border border-indigo-100 rounded-2xl px-5 py-4 font-medium text-sm text-slate-700 h-40 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-300 outline-none transition-all" 
+                                            placeholder="Ex: Se o erro for relacionado a reserva de espaço..." 
+                                        />
                                     </div>
                                 </div>
 
-                                <div className="space-y-4">
+                                <div className="space-y-6">
                                     <div>
                                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2 ml-1">Provedor LLM</label>
-                                        <select value={newAgent.llmProvider} onChange={e => setNewAgent({...newAgent, llmProvider: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-xs uppercase tracking-widest">
+                                        <select value={formData.llmProvider} onChange={e => setFormData({...formData, llmProvider: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-xs uppercase tracking-widest">
                                             <option value="anthropic">Anthropic Claude</option>
                                             <option value="google">Google Gemini</option>
                                             <option value="openai">OpenAI GPT</option>
@@ -173,31 +258,34 @@ const AgentManager: React.FC<AgentManagerProps> = ({ agents, onToggle, onDelete,
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2 ml-1">Modelo de IA</label>
-                                        <input type="text" value={newAgent.llmModel} onChange={e => setNewAgent({...newAgent, llmModel: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-mono text-xs" />
+                                        <input type="text" value={formData.llmModel} onChange={e => setFormData({...formData, llmModel: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-mono text-xs" />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-4">
                                         <div>
                                             <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-2 ml-1">API Key</label>
-                                            <input required type="password" value={newAgent.llmApiKey} onChange={e => setNewAgent({...newAgent, llmApiKey: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-mono text-xs" placeholder="sk-..." />
+                                            <input required={!editingAgentId} type="password" value={formData.llmApiKey} onChange={e => setFormData({...formData, llmApiKey: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-mono text-xs" placeholder="••••••••" />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-2 ml-1">Max Concorrente</label>
+                                                <input type="number" value={formData.maxConcurrentTickets} onChange={e => setFormData({...formData, maxConcurrentTickets: parseInt(e.target.value)})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-xs" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-2 ml-1">Max Tokens</label>
+                                                <input type="number" value={formData.llmMaxTokens} onChange={e => setFormData({...formData, llmMaxTokens: parseInt(e.target.value)})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-xs" />
+                                            </div>
                                         </div>
                                         <div>
-                                            <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-2 ml-1">Max Concorrente</label>
-                                            <input type="number" value={newAgent.maxConcurrentTickets} onChange={e => setNewAgent({...newAgent, maxConcurrentTickets: parseInt(e.target.value)})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-xs" />
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-2 ml-1">Diretório Workspace (Git)</label>
+                                            <input type="text" value={formData.gitWorkspaceDir} onChange={e => setFormData({...formData, gitWorkspaceDir: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-mono text-xs" />
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 flex items-start gap-4">
-                                <Info className="text-indigo-600 shrink-0 mt-1" size={20} />
-                                <p className="text-xs text-indigo-700 font-medium leading-relaxed">
-                                    Ao instanciar este agente, ele ficará inicialmente em estado <strong className="font-black">INATIVO</strong>. Ative-o no painel para iniciar o processamento de tickets pendentes.
-                                </p>
-                            </div>
-
                             <button type="submit" disabled={isLoading} className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-slate-900/30 active:scale-95 transition-all flex items-center justify-center gap-3">
                                 {isLoading ? <Loader2 size={20} className="animate-spin" /> : <Terminal size={20} />}
-                                Implantar Agente no Cluster
+                                {editingAgentId ? 'Salvar Alterações no Cluster' : 'Implantar Agente no Cluster'}
                             </button>
                         </form>
                     </div>

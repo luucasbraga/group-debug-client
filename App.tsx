@@ -19,7 +19,7 @@ import {
     ExternalLink, GitPullRequest, Search, ShieldAlert, 
     Terminal, Workflow, Zap, Filter, RefreshCcw, 
     User, ShieldCheck, Loader2, Save, Plus, Trash2, Mail, Globe, Brain,
-    X, Bot
+    X, Bot, Smartphone, Building, Timer
 } from 'lucide-react';
 import { apiService } from './services/apiService';
 
@@ -41,8 +41,8 @@ const App: React.FC = () => {
     // Modais de Configuração
     const [showZohoModal, setShowZohoModal] = useState(false);
     const [showGitLabModal, setShowGitLabModal] = useState(false);
-    const [newZoho, setNewZoho] = useState<ZohoConfig>({ configName: '', orgId: '', clientId: '', clientSecret: '', refreshToken: '' });
-    const [newGitLab, setNewGitLab] = useState<GitLabConfig>({ configName: '', instanceUrl: 'https://gitlab.com', personalAccessToken: '' });
+    const [newZoho, setNewZoho] = useState<ZohoConfig>({ configName: '', orgId: '', clientId: '', clientSecret: '', refreshToken: '', webhookSecret: '', isActive: true });
+    const [newGitLab, setNewGitLab] = useState<GitLabConfig>({ configName: '', gitlabUrl: 'https://gitlab.com', personalToken: '', username: '', defaultBranch: 'main', isActive: true });
 
     const loadData = useCallback(async () => {
         setIsLoading(true);
@@ -89,13 +89,13 @@ const App: React.FC = () => {
         let interval: any;
         if (selectedTicket) {
             apiService.getTicketLogs(selectedTicket.id).then(setLogs);
-            if (selectedTicket.status === TicketStatus.PROCESSING) {
+            if ([TicketStatus.PROCESSING, TicketStatus.ANALYZING, TicketStatus.FIXING].includes(selectedTicket.status)) {
                 interval = setInterval(async () => {
                     const updated = await apiService.getTicketById(selectedTicket.id);
                     const freshLogs = await apiService.getTicketLogs(selectedTicket.id);
                     setLogs(freshLogs);
                     setSelectedTicket(updated);
-                    if (updated.status !== TicketStatus.PROCESSING) clearInterval(interval);
+                    if (![TicketStatus.PROCESSING, TicketStatus.ANALYZING, TicketStatus.FIXING].includes(updated.status)) clearInterval(interval);
                 }, 5000);
             }
         }
@@ -116,7 +116,7 @@ const App: React.FC = () => {
             } else {
                 await apiService.activateAgent(agent.id);
             }
-            await loadData(); // Recarrega para ver status atualizado e novos tickets processando
+            await loadData();
         } catch (err) {
             alert("Erro ao alterar status do agente.");
         } finally {
@@ -146,6 +146,18 @@ const App: React.FC = () => {
         }
     };
 
+    const handleUpdateAgent = async (id: string, agent: Partial<Agent>) => {
+        setIsLoading(true);
+        try {
+            await apiService.updateAgent(id, agent);
+            await loadData();
+        } catch (err) {
+            alert("Erro ao atualizar agente.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleAddZoho = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
@@ -153,7 +165,7 @@ const App: React.FC = () => {
             await apiService.addZohoConfig(newZoho);
             await loadConfigs();
             setShowZohoModal(false);
-            setNewZoho({ configName: '', orgId: '', clientId: '', clientSecret: '', refreshToken: '' });
+            setNewZoho({ configName: '', orgId: '', clientId: '', clientSecret: '', refreshToken: '', webhookSecret: '', isActive: true });
         } catch (err) {
             alert("Erro ao adicionar conexão Zoho.");
         } finally {
@@ -168,7 +180,7 @@ const App: React.FC = () => {
             await apiService.addGitLabConfig(newGitLab);
             await loadConfigs();
             setShowGitLabModal(false);
-            setNewGitLab({ configName: '', instanceUrl: 'https://gitlab.com', personalAccessToken: '' });
+            setNewGitLab({ configName: '', gitlabUrl: 'https://gitlab.com', personalToken: '', username: '', defaultBranch: 'main', isActive: true });
         } catch (err) {
             alert("Erro ao adicionar conexão GitLab.");
         } finally {
@@ -235,10 +247,10 @@ const App: React.FC = () => {
                 {activeTab === 'dashboard' && (
                     <div className="space-y-12 animate-in fade-in duration-500">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                            <StatCard label="Agentes Ativos" value={agents.filter(a => a.status === AgentStatus.ACTIVE).length} icon={<Bot size={28} />} color="bg-indigo-50 text-indigo-600" />
-                            <StatCard label="Tickets Pendentes" value={tickets.filter(t => t.status === TicketStatus.PENDING).length} icon={<Zap size={28} />} color="bg-blue-50 text-blue-600" />
-                            <StatCard label="Correções Efetuadas" value={tickets.filter(t => t.status === TicketStatus.COMPLETED).length} icon={<CheckCircle2 size={28} />} color="bg-emerald-50 text-emerald-600" trend="+12%" />
-                            <StatCard label="Uptime Cluster" value={health?.uptime || '---'} icon={<Activity size={28} />} color="bg-slate-50 text-slate-600" />
+                            <StatCard label="Agentes Ativos" value={health?.activeAgents || agents.filter(a => a.status === AgentStatus.ACTIVE).length} icon={<Bot size={28} />} color="bg-indigo-50 text-indigo-600" />
+                            <StatCard label="Tickets Pendentes" value={health?.pending || tickets.filter(t => t.status === TicketStatus.PENDING).length} icon={<Zap size={28} />} color="bg-blue-50 text-blue-600" />
+                            <StatCard label="Ciclo Médio (s)" value={health?.averageProcessingTimeMs ? (health.averageProcessingTimeMs / 1000).toFixed(1) : '---'} icon={<Timer size={28} />} color="bg-amber-50 text-amber-600" />
+                            <StatCard label="Correções Efetuadas" value={health?.completed || tickets.filter(t => t.status === TicketStatus.COMPLETED).length} icon={<CheckCircle2 size={28} />} color="bg-emerald-50 text-emerald-600" trend="+12%" />
                         </div>
                         <div className="bg-white border border-slate-200 rounded-[3rem] p-10 shadow-xl shadow-slate-200/30">
                             <h2 className="text-xl font-black mb-8 flex items-center gap-4"><Workflow size={24} className="text-indigo-600"/> Últimas Atividades</h2>
@@ -273,6 +285,7 @@ const App: React.FC = () => {
                         onToggle={handleToggleAgent} 
                         onDelete={handleDeleteAgent} 
                         onCreate={handleCreateAgent}
+                        onUpdate={handleUpdateAgent}
                         isLoading={isLoading} 
                     />
                 )}
@@ -299,7 +312,7 @@ const App: React.FC = () => {
                                         <div>
                                             <div className="flex items-center gap-3 mb-2">
                                                 <span className="text-xs font-black text-indigo-600">{t.ticketNumber}</span>
-                                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg ${t.priority === 'HIGH' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-slate-100 text-slate-500'}`}>{t.priority === 'HIGH' ? 'ALTA' : t.priority}</span>
+                                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg ${['HIGH', 'CRITICAL'].includes(t.priority) ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-slate-100 text-slate-500'}`}>{t.priority}</span>
                                             </div>
                                             <h3 className="font-black text-lg text-slate-900">{t.subject}</h3>
                                             <p className="text-sm text-slate-400 mt-1">{t.repositoryName || 'Identificação pendente...'}</p>
@@ -322,9 +335,12 @@ const App: React.FC = () => {
                                 <h3 className="text-2xl font-black mb-8 flex items-center gap-4 text-blue-600"><Globe size={32} /> Gateways Zoho Desk</h3>
                                 <div className="space-y-4">
                                     {zohoConfigs.map(config => (
-                                        <div key={config.id} className="p-6 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+                                        <div key={config.id} className={`p-6 bg-slate-50 rounded-2xl border flex items-center justify-between ${config.isActive ? 'border-blue-200' : 'border-slate-200 opacity-60'}`}>
                                             <div>
-                                                <p className="font-black text-slate-900">{config.configName}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-black text-slate-900">{config.configName}</p>
+                                                    {config.isActive && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>}
+                                                </div>
                                                 <p className="text-[10px] text-slate-400 uppercase font-bold">Org: {config.orgId} • Cliente: {config.clientId}</p>
                                             </div>
                                             <button onClick={() => apiService.deleteZohoConfig(config.id!).then(loadConfigs)} className="p-3 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={18} /></button>
@@ -342,10 +358,13 @@ const App: React.FC = () => {
                                 <h3 className="text-2xl font-black mb-8 flex items-center gap-4 text-orange-600"><GitPullRequest size={32} /> Clusters GitLab</h3>
                                 <div className="space-y-4">
                                     {gitlabConfigs.map(config => (
-                                        <div key={config.id} className="p-6 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+                                        <div key={config.id} className={`p-6 bg-slate-50 rounded-2xl border flex items-center justify-between ${config.isActive ? 'border-orange-200' : 'border-slate-200 opacity-60'}`}>
                                             <div>
-                                                <p className="font-black text-slate-900">{config.configName}</p>
-                                                <p className="text-[10px] text-slate-400 font-mono">{config.instanceUrl}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-black text-slate-900">{config.configName}</p>
+                                                    {config.isActive && <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>}
+                                                </div>
+                                                <p className="text-[10px] text-slate-400 font-mono">User: {config.username} • {config.gitlabUrl}</p>
                                             </div>
                                             <button onClick={() => apiService.deleteGitLabConfig(config.id!).then(loadConfigs)} className="p-3 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={18} /></button>
                                         </div>
@@ -360,34 +379,40 @@ const App: React.FC = () => {
                 )}
 
                 {activeTab === 'profile' && profile && (
-                    <div className="max-w-2xl mx-auto space-y-10 animate-in zoom-in duration-500">
-                        <section className="bg-white border border-slate-200 rounded-[3.5rem] p-16 text-center shadow-2xl shadow-slate-200/50 relative overflow-hidden">
+                    <div className="max-w-4xl mx-auto space-y-10 animate-in zoom-in duration-500">
+                        <section className="bg-white border border-slate-200 rounded-[3.5rem] p-16 shadow-2xl shadow-slate-200/50 relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[100px] -mr-32 -mt-32"></div>
                             <div className="relative z-10">
-                                <div className="w-32 h-32 bg-indigo-600 text-white rounded-[3rem] flex items-center justify-center text-4xl font-black mx-auto mb-8 shadow-2xl shadow-indigo-600/30">
-                                    {profile.fullName.charAt(0)}
-                                </div>
-                                <h2 className="text-4xl font-black text-slate-900 mb-2">{profile.fullName}</h2>
-                                <p className="text-indigo-600 font-black text-[10px] uppercase tracking-[0.3em] mb-12">Proprietário do Nó Autorizado</p>
-                                
-                                <div className="grid grid-cols-1 gap-6 text-left">
-                                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Nome Completo</label>
-                                        <input 
-                                            type="text" 
-                                            value={profile.fullName}
-                                            onChange={e => setProfile({...profile, fullName: e.target.value})}
-                                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-black text-slate-900 focus:ring-4 focus:ring-indigo-100 outline-none" 
-                                        />
+                                <div className="flex flex-col md:flex-row items-center gap-12 mb-16">
+                                    <div className="w-40 h-40 bg-indigo-600 text-white rounded-[3.5rem] flex items-center justify-center text-5xl font-black shadow-2xl shadow-indigo-600/30">
+                                        {profile.avatarUrl ? <img src={profile.avatarUrl} className="w-full h-full object-cover rounded-[3.5rem]" alt="Avatar" /> : profile.fullName.charAt(0)}
                                     </div>
-                                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">E-mail Administrativo</label>
-                                        <input 
-                                            type="email" 
-                                            value={profile.email}
-                                            onChange={e => setProfile({...profile, email: e.target.value})}
-                                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-black text-slate-900 focus:ring-4 focus:ring-indigo-100 outline-none" 
-                                        />
+                                    <div className="text-center md:text-left flex-1">
+                                        <h2 className="text-5xl font-black text-slate-900 mb-2">{profile.fullName}</h2>
+                                        <p className="text-indigo-600 font-black text-[10px] uppercase tracking-[0.3em] mb-4">Membro de {profile.company || 'Group Debug'}</p>
+                                        <div className="flex flex-wrap gap-3 justify-center md:justify-start">
+                                            <span className="px-4 py-2 bg-slate-100 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-500 border border-slate-200 flex items-center gap-2"><Building size={12}/> {profile.department || 'Operações'}</span>
+                                            <span className="px-4 py-2 bg-slate-100 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-500 border border-slate-200 flex items-center gap-2"><Globe size={12}/> {profile.timezone || 'UTC'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+                                    <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Nome de Usuário</label>
+                                        <input type="text" value={profile.username} disabled className="w-full bg-slate-200/50 border border-slate-200 rounded-xl px-4 py-3 font-black text-slate-500 cursor-not-allowed" />
+                                    </div>
+                                    <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">E-mail Corporativo</label>
+                                        <input type="email" value={profile.email} onChange={e => setProfile({...profile, email: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-black text-slate-900 focus:ring-4 focus:ring-indigo-100 outline-none" />
+                                    </div>
+                                    <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Departamento</label>
+                                        <input type="text" value={profile.department || ''} onChange={e => setProfile({...profile, department: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-black text-slate-900 focus:ring-4 focus:ring-indigo-100 outline-none" />
+                                    </div>
+                                    <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Telefone</label>
+                                        <input type="text" value={profile.phone || ''} onChange={e => setProfile({...profile, phone: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-black text-slate-900 focus:ring-4 focus:ring-indigo-100 outline-none" />
                                     </div>
                                 </div>
                                 <button 
@@ -396,7 +421,7 @@ const App: React.FC = () => {
                                     className="mt-12 px-10 py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center mx-auto gap-3"
                                 >
                                     {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                                    Atualizar Identidade
+                                    Preservar Alterações
                                 </button>
                             </div>
                         </section>
@@ -443,8 +468,8 @@ const App: React.FC = () => {
                                 <h3 className="font-black text-xl mb-12 flex items-center gap-4 text-slate-900"><Zap size={24} className="text-indigo-600" />Pipeline de Corretor</h3>
                                 <AutomationFlow logs={logs} currentStatus={selectedTicket.status} />
                             </div>
-                            {selectedTicket.prUrl && (
-                                <a href={selectedTicket.prUrl} target="_blank" rel="noreferrer" className="block w-full p-8 bg-slate-900 text-white rounded-[2.5rem] text-center font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-900/20">
+                            {selectedTicket.pullRequestUrl && (
+                                <a href={selectedTicket.pullRequestUrl} target="_blank" rel="noreferrer" className="block w-full p-8 bg-slate-900 text-white rounded-[2.5rem] text-center font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-900/20">
                                     <GitPullRequest size={24} className="inline mr-3" />
                                     Auditar PR no GitLab
                                 </a>
@@ -457,38 +482,59 @@ const App: React.FC = () => {
                     <div className="space-y-12 animate-in fade-in duration-500">
                         <div className="bg-white border border-slate-200 rounded-[3.5rem] p-16 shadow-2xl shadow-slate-200/50 flex flex-col md:flex-row items-center justify-between gap-10">
                             <div>
-                                <h2 className="text-5xl font-black mb-4 text-slate-900">Saúde do Cluster</h2>
-                                <p className="text-slate-500 text-xl font-medium">Status operacional dos recursos e integrações conectadas.</p>
+                                <h2 className="text-5xl font-black mb-4 text-slate-900">Telemetria de Rede</h2>
+                                <p className="text-slate-500 text-xl font-medium">Status operacional dos recursos e integrações do cluster.</p>
                             </div>
                             <div className="px-10 py-5 bg-emerald-50 text-emerald-600 rounded-[2.5rem] border border-emerald-100 font-black flex items-center gap-4">
                                 <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
-                                SISTEMA OPERANTE
+                                CLUSTER {health.status.toUpperCase()}
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
                             <div className="bg-white border border-slate-200 rounded-[3rem] p-12 shadow-xl shadow-slate-200/50">
-                                <h3 className="text-2xl font-black mb-10 flex items-center gap-4"><Database size={28} className="text-indigo-600" />Persistência & Cache</h3>
+                                <h3 className="text-2xl font-black mb-10 flex items-center gap-4"><Zap size={28} className="text-indigo-600" />Carga de Tickets</h3>
                                 <div className="space-y-6">
-                                    <div className="p-8 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100">
-                                        <span className="font-black text-slate-600">Banco de Dados PostgreSQL</span>
-                                        <span className={`px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest ${health.database === 'UP' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{health.database === 'UP' ? 'ONLINE' : 'OFFLINE'}</span>
+                                    <div className="flex justify-between items-center py-4 border-b border-slate-100">
+                                        <span className="font-black text-slate-400 text-xs uppercase tracking-widest">Total Processado</span>
+                                        <span className="font-black text-slate-900">{health.totalTickets}</span>
                                     </div>
-                                    <div className="p-8 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100">
-                                        <span className="font-black text-slate-600">Redis Memory Store</span>
-                                        <span className={`px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest ${health.redis === 'UP' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{health.redis === 'UP' ? 'ONLINE' : 'OFFLINE'}</span>
+                                    <div className="flex justify-between items-center py-4 border-b border-slate-100">
+                                        <span className="font-black text-slate-400 text-xs uppercase tracking-widest">Analisando Agora</span>
+                                        <span className="font-black text-indigo-600">{health.analyzing}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center py-4">
+                                        <span className="font-black text-slate-400 text-xs uppercase tracking-widest">Correções em Curso</span>
+                                        <span className="font-black text-amber-600">{health.fixing}</span>
                                     </div>
                                 </div>
                             </div>
                             <div className="bg-white border border-slate-200 rounded-[3rem] p-12 shadow-xl shadow-slate-200/50">
-                                <h3 className="text-2xl font-black mb-10 flex items-center gap-4"><Globe size={28} className="text-blue-600" />Endpoints de Integração</h3>
+                                <h3 className="text-2xl font-black mb-10 flex items-center gap-4"><CheckCircle2 size={28} className="text-emerald-600" />Taxa de Sucesso</h3>
                                 <div className="space-y-6">
-                                    <div className="p-8 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100">
-                                        <span className="font-black text-slate-600">API Gateway Zoho</span>
-                                        <span className={`px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest ${health.zohoApi === 'UP' ? 'bg-blue-100 text-blue-700' : 'bg-rose-100 text-rose-700'}`}>{health.zohoApi === 'UP' ? 'CONECTADO' : 'FALHA'}</span>
+                                    <div className="flex justify-between items-center py-4 border-b border-slate-100">
+                                        <span className="font-black text-slate-400 text-xs uppercase tracking-widest">Concluídos</span>
+                                        <span className="font-black text-emerald-600">{health.completed}</span>
                                     </div>
-                                    <div className="p-8 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100">
-                                        <span className="font-black text-slate-600">GitLab Runner Node</span>
-                                        <span className={`px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest ${health.gitlabApi === 'UP' ? 'bg-blue-100 text-blue-700' : 'bg-rose-100 text-rose-700'}`}>{health.gitlabApi === 'UP' ? 'CONECTADO' : 'FALHA'}</span>
+                                    <div className="flex justify-between items-center py-4 border-b border-slate-100">
+                                        <span className="font-black text-slate-400 text-xs uppercase tracking-widest">Falhas Críticas</span>
+                                        <span className="font-black text-rose-600">{health.failed}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center py-4">
+                                        <span className="font-black text-slate-400 text-xs uppercase tracking-widest">Eficiência Global</span>
+                                        <span className="font-black text-slate-900">{health.totalTickets ? ((health.completed / health.totalTickets) * 100).toFixed(1) : 0}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-white border border-slate-200 rounded-[3rem] p-12 shadow-xl shadow-slate-200/50">
+                                <h3 className="text-2xl font-black mb-10 flex items-center gap-4"><Activity size={28} className="text-blue-600" />Recursos</h3>
+                                <div className="space-y-6">
+                                    <div className="flex justify-between items-center py-4 border-b border-slate-100">
+                                        <span className="font-black text-slate-400 text-xs uppercase tracking-widest">Agentes Ativos</span>
+                                        <span className="font-black text-blue-600">{health.activeAgents}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center py-4">
+                                        <span className="font-black text-slate-400 text-xs uppercase tracking-widest">Latência Média</span>
+                                        <span className="font-black text-slate-900">{(health.averageProcessingTimeMs / 1000).toFixed(1)}s</span>
                                     </div>
                                 </div>
                             </div>
@@ -528,6 +574,10 @@ const App: React.FC = () => {
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Refresh Token Oauth</label>
                                 <input required type="text" value={newZoho.refreshToken} onChange={e => setNewZoho({...newZoho, refreshToken: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-sm" placeholder="1000.xxx" />
                             </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Webhook Secret</label>
+                                <input type="text" value={newZoho.webhookSecret} onChange={e => setNewZoho({...newZoho, webhookSecret: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-sm" placeholder="Secret Key" />
+                            </div>
                             <button type="submit" disabled={isSaving} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-600/20 active:scale-95 transition-all">
                                 {isSaving ? <Loader2 size={18} className="animate-spin inline mr-2" /> : <Plus size={18} className="inline mr-2" />}
                                 Sincronizar Gateway
@@ -552,11 +602,21 @@ const App: React.FC = () => {
                             </div>
                             <div>
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Instância GitLab (URL)</label>
-                                <input required type="url" value={newGitLab.instanceUrl} onChange={e => setNewGitLab({...newGitLab, instanceUrl: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-sm" placeholder="https://gitlab.com" />
+                                <input required type="url" value={newGitLab.gitlabUrl} onChange={e => setNewGitLab({...newGitLab, gitlabUrl: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-sm" placeholder="https://gitlab.com" />
                             </div>
                             <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Personal Access Token</label>
-                                <input required type="password" value={newGitLab.personalAccessToken} onChange={e => setNewGitLab({...newGitLab, personalAccessToken: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-sm" placeholder="glpat-..." />
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Bot Username</label>
+                                <input required type="text" value={newGitLab.username} onChange={e => setNewGitLab({...newGitLab, username: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-sm" placeholder="bot-user" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Default Branch</label>
+                                    <input required type="text" value={newGitLab.defaultBranch} onChange={e => setNewGitLab({...newGitLab, defaultBranch: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-sm" placeholder="main" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Personal Token</label>
+                                    <input required type="password" value={newGitLab.personalToken} onChange={e => setNewGitLab({...newGitLab, personalToken: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-black text-sm" placeholder="glpat-..." />
+                                </div>
                             </div>
                             <button type="submit" disabled={isSaving} className="w-full py-5 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-orange-600/20 active:scale-95 transition-all">
                                 {isSaving ? <Loader2 size={18} className="animate-spin inline mr-2" /> : <Plus size={18} className="inline mr-2" />}
